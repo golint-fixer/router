@@ -1,4 +1,4 @@
-# pat [![Build Status](https://travis-ci.org/vinci-proxy/pat.png)](https://travis-ci.org/vinci-proxy/pat [![GoDoc](https://godoc.org/github.com/vinci-proxy/pat?status.svg)](https://godoc.org/github.com/vinci-proxy/pat) [![Coverage Status](https://coveralls.io/repos/github/vinci-proxy/pat/badge.svg?branch=master)](https://coveralls.io/github/vinci-proxy/pat?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/vinci-proxy/pat)](https://goreportcard.com/report/github.com/vinci-proxy/pat)
+# pat [![Build Status](https://travis-ci.org/vinci-proxy/pat.png)](https://travis-ci.org/vinci-proxy/pat) [![GoDoc](https://godoc.org/github.com/vinci-proxy/pat?status.svg)](https://godoc.org/github.com/vinci-proxy/pat) [![Coverage Status](https://coveralls.io/repos/github/vinci-proxy/pat/badge.svg?branch=master)](https://coveralls.io/github/vinci-proxy/pat?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/vinci-proxy/pat)](https://goreportcard.com/report/github.com/vinci-proxy/pat)
 
 Simple, idiomatic and fast pattern muxer designed for dynamic routing.
 
