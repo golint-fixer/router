@@ -204,7 +204,7 @@ func (p *PatternServeMux) add(meth, pat string, h http.Handler, redirect bool) {
 			return // found existing pattern; do nothing
 		}
 	}
-	handler := &PatHandler{
+	handler := &Handler{
 		pat:      pat,
 		Handler:  h,
 		redirect: redirect,
@@ -253,15 +253,15 @@ func Tail(pat, path string) string {
 	return ""
 }
 
-// PatHandler represents a pattern handler.
-type PatHandler struct {
+// Handler represents a pattern handler.
+type Handler struct {
 	pat string
 	http.Handler
 	redirect bool
 }
 
 // Match matches the given path string againts the register pattern.
-func (ph *PatHandler) Match(path string) (url.Values, bool) {
+func (ph *Handler) Match(path string) (url.Values, bool) {
 	p := make(url.Values)
 	var i, j int
 	for i < len(path) {
