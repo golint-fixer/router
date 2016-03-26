@@ -40,7 +40,7 @@ func TestPatMatch(t *testing.T) {
 		{"/foo/x:name", "/foo/bar", false, nil},
 		{"/foo/x:name", "/foo/xbar", true, url.Values{":name": {"bar"}}},
 	} {
-		params, ok := (&PatHandler{pat: tt.pat}).Match(tt.u)
+		params, ok := (&Handler{pat: tt.pat}).Match(tt.u)
 		if !tt.match {
 			if ok {
 				t.Errorf("[%d] url %q matched pattern %q", i, tt.u, tt.pat)

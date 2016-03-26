@@ -100,12 +100,12 @@ type PatternServeMux struct {
 	NotFound http.Handler
 
 	// Handlers associates HTTP methods with path patterns handlers.
-	Handlers map[string][]*PatHandler
+	Handlers map[string][]*Handler
 }
 
 // New returns a new PatternServeMux.
 func New() *PatternServeMux {
-	return &PatternServeMux{Handlers: make(map[string][]*PatHandler)}
+	return &PatternServeMux{Handlers: make(map[string][]*Handler)}
 }
 
 // HandleHTTP matches r.URL.Path against its routing table using the rules
