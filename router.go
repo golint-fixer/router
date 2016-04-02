@@ -233,14 +233,17 @@ func doMatch(routes []*Route, path string) (url.Values, *Route) {
 
 // Remove matches and removes the matched route from the router stack.
 func (r *Router) Remove(method, path string) bool {
-	// TODO
-	return true
-}
-
-// RemoveRoute removes the given route from the router stack.
-func (r *Router) RemoveRoute(route *Route) bool {
-	// TODO
-	return true
+	routes := r.Routes[method]
+	if routes == nil || len(routes) == 0 {
+		return false
+	}
+	for i, route := range routes {
+		if _, ok := route.Match(path); ok {
+			r.Routes[method] = append(routes[:i], routes[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 // HandleHTTP matches r.URL.Path against its routing table

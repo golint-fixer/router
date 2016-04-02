@@ -11,6 +11,28 @@ import (
 	"testing"
 )
 
+func TestRouterRemoveRoute(t *testing.T) {
+	p := New()
+	p.Get("/foo")
+	p.All("/bar")
+
+	st.Expect(t, len(p.Routes["GET"]), 1)
+	st.Expect(t, len(p.Routes["*"]), 1)
+
+	st.Expect(t, routeExists(p, "*", "/bar"), true)
+	st.Expect(t, routeExists(p, "GET", "/foo"), true)
+
+	st.Expect(t, p.Remove("GET", "/foo"), true)
+	st.Expect(t, len(p.Routes["GET"]), 0)
+	st.Expect(t, routeExists(p, "GET", "/foo"), false)
+
+	st.Expect(t, p.Remove("*", "/bar"), true)
+	st.Expect(t, len(p.Routes["*"]), 0)
+	st.Expect(t, routeExists(p, "*", "/bar"), false)
+
+	st.Expect(t, p.Remove("*", "/baz"), false)
+}
+
 func TestRoutingHit(t *testing.T) {
 	p := New()
 
@@ -183,4 +205,9 @@ func newRequest(method, urlStr string, body io.Reader) *http.Request {
 		panic(err)
 	}
 	return req
+}
+
+func routeExists(r *Router, method, path string) bool {
+	route, _ := r.FindRoute(method, path)
+	return route != nil
 }
