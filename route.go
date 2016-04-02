@@ -57,12 +57,6 @@ func (r *Route) UsePhase(phase string, handler interface{}) *Route {
 	return r
 }
 
-// Flush flushes all the router middleware stack.
-// Use this method if you want to
-func (r *Route) Flush() {
-	r.Layer.Flush()
-}
-
 // ServeHTTP handlers the incoming request and implemented the vinxi specific handler interface.
 func (r *Route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.Layer.Run(layer.RequestPhase, w, req, r.Handler)

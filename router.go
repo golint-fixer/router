@@ -306,9 +306,3 @@ func (r *Router) UseFinalHandler(fn http.Handler) *Router {
 	r.Layer.UseFinalHandler(fn)
 	return r
 }
-
-// Flush flushes all the router middleware stack.
-// Use this method if you want to
-func (r *Router) Flush() {
-	r.Layer.Flush()
-}
