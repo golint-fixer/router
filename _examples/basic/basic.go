@@ -11,16 +11,16 @@ func main() {
 	fmt.Printf("Server listening on port: %d\n", 3100)
 	vs := vinxi.NewServer(vinxi.ServerOptions{Host: "localhost", Port: 3100})
 
-	router := pat.New()
-	router.Get("/foo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r := router.New()
+	r.Get("/get").Forward("http://httpbin.org")
+	r.Get("/headers").Forward("http://httpbin.org")
+	r.Get("/image/:format").Forward("http://httpbin.org")
+	r.Get("/say").Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello, foo"))
 	}))
-	router.Get("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello world"))
-	}))
 
-	vs.Use(router)
-	vs.Forward("http://httpbin.org")
+	vs.Use(r)
+	vs.Forward("http://example.com")
 
 	err := vs.Listen()
 	if err != nil {

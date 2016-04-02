@@ -1,13 +1,23 @@
-// Package pat implements a simple URL pattern muxer
-package pat
+// Package router implements a simple URL pattern muxer router
+// with hierarchical middleware layer.
+package router
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"gopkg.in/vinxi/forward.v0"
+	"gopkg.in/vinxi/layer.v0"
 )
 
-// PatternServeMux is an HTTP request multiplexer. It matches the URL of each
+var (
+	// ErrNoRouteMatch is returned as typed error when no route can be matched.
+	ErrNoRouteMatch = errors.New("router: cannot match any route")
+)
+
+// Router is an HTTP request multiplexer. It matches the URL of each
 // incoming request against a list of registered patterns with their associated
 // methods and calls the handler for the pattern that most closely matches the
 // URL.
@@ -86,235 +96,219 @@ import (
 // When "Method Not Allowed":
 //
 // Pat knows what methods are allowed given a pattern and a URI. For
-// convenience, PatternServeMux will add the Allow header for requests that
+// convenience, Router will add the Allow header for requests that
 // match a pattern for a method other than the method requested and set the
 // Status to "405 Method Not Allowed".
 //
 // If the NotFound handler is set, then it is used whenever the pattern doesn't
 // match the request path for the current method (and the Allow header is not
 // altered).
-type PatternServeMux struct {
+type Router struct {
 	// NotFound, if set, is used whenever the request doesn't match any
 	// pattern for its method. NotFound should be set before serving any
 	// requests.
 	NotFound http.Handler
 
-	// Handlers associates HTTP methods with path patterns handlers.
-	Handlers map[string][]*Handler
+	// Layer provides middleware layer capabilities to the router.
+	Layer *layer.Layer
+
+	// Routes associates HTTP methods with path patterns handlers.
+	Routes map[string][]*Route
 }
 
-// New returns a new PatternServeMux.
-func New() *PatternServeMux {
-	return &PatternServeMux{Handlers: make(map[string][]*Handler)}
+// New returns a new Router.
+func New() *Router {
+	return &Router{Layer: layer.New(), Routes: make(map[string][]*Route)}
 }
 
-// HandleHTTP matches r.URL.Path against its routing table using the rules
-// described above.
-func (p *PatternServeMux) HandleHTTP(w http.ResponseWriter, r *http.Request, h http.Handler) {
-	for _, ph := range p.Handlers[r.Method] {
-		if params, ok := ph.Match(r.URL.Path); ok {
-			if len(params) > 0 && !ph.redirect {
-				r.URL.RawQuery = url.Values(params).Encode() + "&" + r.URL.RawQuery
-			}
-			ph.ServeHTTP(w, r)
-			return
+// Forward defines the default URL to forward incoming traffic.
+func (r *Router) Forward(uri string) *Router {
+	r.Layer.UseFinalHandler(http.HandlerFunc(forward.To(uri)))
+	return r
+}
+
+// Head will register a pattern for HEAD requests.
+func (r *Router) Head(pat string) *Route {
+	return r.add("HEAD", pat, nil)
+}
+
+// Get will register a pattern for GET requests.
+// It also registers pat for HEAD requests. If this needs to be overridden, use
+// Head before Get with pat.
+func (r *Router) Get(pat string) *Route {
+	return r.add("GET", pat, nil)
+}
+
+// Post will register a pattern for POST requests.
+func (r *Router) Post(pat string) *Route {
+	return r.add("POST", pat, nil)
+}
+
+// Put will register a pattern for PUT requests.
+func (r *Router) Put(pat string) *Route {
+	return r.add("PUT", pat, nil)
+}
+
+// Del will register a pattern for DELETE requests.
+func (r *Router) Del(pat string) *Route {
+	return r.add("DELETE", pat, nil)
+}
+
+// Options will register a pattern for OPTIONS requests.
+func (r *Router) Options(pat string) *Route {
+	return r.add("OPTIONS", pat, nil)
+}
+
+// Patch will register a pattern for PATCH requests.
+func (r *Router) Patch(pat string) *Route {
+	return r.add("PATCH", pat, nil)
+}
+
+// All will register a pattern for any HTTP method.
+func (r *Router) All(pat string) *Route {
+	return r.add("*", pat, nil)
+}
+
+// Route will register a new route for the given pattern and HTTP method.
+func (r *Router) Route(method, pat string) *Route {
+	return r.add(method, pat, nil)
+}
+
+// add adds a new route to the router stack for the given method and path pattern.
+func (r *Router) add(method, pat string, handler http.Handler) *Route {
+	// Check route pattern is unique
+	routes := r.Routes[method]
+	for _, p1 := range routes {
+		if p1.Pattern == pat {
+			return p1
 		}
 	}
 
-	// If not found handler is defined, just continue.
-	if p.NotFound != nil {
-		p.NotFound.ServeHTTP(w, r)
+	route := NewRoute(pat)
+	if handler != nil {
+		route.Handler = handler
+	}
+
+	// Register the route in the router stack
+	r.Routes[method] = append(routes, route)
+
+	n := len(pat)
+	if n > 0 && pat[n-1] == '/' {
+		r.add(method, pat[:n-1], route)
+	}
+
+	return route
+}
+
+// FindRoute tries to find a registered route who matches
+// with the given method and path.
+func (r *Router) FindRoute(method, path string) (*Route, error) {
+	if _, route := r.match(method, path); route != nil {
+		return route, nil
+	}
+	return nil, ErrNoRouteMatch
+}
+
+// match matches a registered route against the given method and URL path.
+func (r *Router) match(method, path string) (url.Values, *Route) {
+	// Match routes by given method
+	if params, route := doMatch(r.Routes[method], path); route != nil {
+		return params, route
+	}
+	// Match any method routes
+	return doMatch(r.Routes["*"], path)
+}
+
+func doMatch(routes []*Route, path string) (url.Values, *Route) {
+	if routes == nil || len(routes) == 0 {
+		return nil, nil
+	}
+	for _, route := range routes {
+		if params, ok := route.Match(path); ok {
+			return params, route
+		}
+	}
+	return nil, nil
+}
+
+// Remove matches and removes the matched route from the router stack.
+func (r *Router) Remove(method, path string) bool {
+	// TODO
+	return true
+}
+
+// RemoveRoute removes the given route from the router stack.
+func (r *Router) RemoveRoute(route *Route) bool {
+	// TODO
+	return true
+}
+
+// HandleHTTP matches r.URL.Path against its routing table
+// using the rules described above.
+func (r *Router) HandleHTTP(w http.ResponseWriter, req *http.Request, h http.Handler) {
+	if params, route := r.match(req.Method, req.URL.Path); route != nil {
+		if len(params) > 0 {
+			req.URL.RawQuery = url.Values(params).Encode() + "&" + req.URL.RawQuery
+		}
+		r.Layer.Run(layer.RequestPhase, w, req, route)
 		return
 	}
 
-	allowed := make([]string, 0, len(p.Handlers))
-	for meth, handlers := range p.Handlers {
-		if meth == r.Method {
+	// If not found handler is defined, just continue.
+	if r.NotFound != nil {
+		r.NotFound.ServeHTTP(w, req)
+		return
+	}
+
+	allowed := make([]string, 0, len(r.Routes))
+	for meth, handlers := range r.Routes {
+		if meth == req.Method {
 			continue
 		}
 
-		for _, ph := range handlers {
-			if _, ok := ph.Match(r.URL.Path); ok {
+		for _, r := range handlers {
+			if _, ok := r.Match(req.URL.Path); ok {
 				allowed = append(allowed, meth)
 			}
 		}
 	}
 
+	// TODO: make response optional
 	if len(allowed) > 0 {
 		w.Header().Add("Allow", strings.Join(allowed, ", "))
 		http.Error(w, "Method Not Allowed", 405)
 		return
 	}
 
-	if p.NotFound != nil {
-		p.NotFound.ServeHTTP(w, r)
+	// If not found handler defines, use it
+	if r.NotFound != nil {
+		r.NotFound.ServeHTTP(w, req)
 		return
 	}
 
-	h.ServeHTTP(w, r)
+	h.ServeHTTP(w, req)
 }
 
-// Head will register a pattern with a handler for HEAD requests.
-func (p *PatternServeMux) Head(pat string, h http.Handler) {
-	p.Add("HEAD", pat, h)
+// Use attaches a new middleware handler for incoming HTTP traffic.
+func (r *Router) Use(handler ...interface{}) *Router {
+	r.Layer.Use(layer.RequestPhase, handler...)
+	return r
 }
 
-// Get will register a pattern with a handler for GET requests.
-// It also registers pat for HEAD requests. If this needs to be overridden, use
-// Head before Get with pat.
-func (p *PatternServeMux) Get(pat string, h http.Handler) {
-	p.Add("HEAD", pat, h)
-	p.Add("GET", pat, h)
+// UsePhase attaches a new middleware handler to a specific phase.
+func (r *Router) UsePhase(phase string, handler ...interface{}) *Router {
+	r.Layer.Use(phase, handler...)
+	return r
 }
 
-// Post will register a pattern with a handler for POST requests.
-func (p *PatternServeMux) Post(pat string, h http.Handler) {
-	p.Add("POST", pat, h)
+// UseFinalHandler uses a new middleware handler function as final handler.
+func (r *Router) UseFinalHandler(fn http.Handler) *Router {
+	r.Layer.UseFinalHandler(fn)
+	return r
 }
 
-// Put will register a pattern with a handler for PUT requests.
-func (p *PatternServeMux) Put(pat string, h http.Handler) {
-	p.Add("PUT", pat, h)
-}
-
-// Del will register a pattern with a handler for DELETE requests.
-func (p *PatternServeMux) Del(pat string, h http.Handler) {
-	p.Add("DELETE", pat, h)
-}
-
-// Options will register a pattern with a handler for OPTIONS requests.
-func (p *PatternServeMux) Options(pat string, h http.Handler) {
-	p.Add("OPTIONS", pat, h)
-}
-
-// Patch will register a pattern with a handler for PATCH requests.
-func (p *PatternServeMux) Patch(pat string, h http.Handler) {
-	p.Add("PATCH", pat, h)
-}
-
-// Add will register a pattern with a handler for meth requests.
-func (p *PatternServeMux) Add(meth, pat string, h http.Handler) {
-	p.add(meth, pat, h, false)
-}
-
-func (p *PatternServeMux) add(meth, pat string, h http.Handler, redirect bool) {
-	handlers := p.Handlers[meth]
-	for _, p1 := range handlers {
-		if p1.pat == pat {
-			return // found existing pattern; do nothing
-		}
-	}
-	handler := &Handler{
-		pat:      pat,
-		Handler:  h,
-		redirect: redirect,
-	}
-	p.Handlers[meth] = append(handlers, handler)
-
-	n := len(pat)
-	if n > 0 && pat[n-1] == '/' {
-		p.add(meth, pat[:n-1], http.HandlerFunc(addSlashRedirect), true)
-	}
-}
-
-func addSlashRedirect(w http.ResponseWriter, r *http.Request) {
-	u := *r.URL
-	u.Path += "/"
-	http.Redirect(w, r, u.String(), http.StatusMovedPermanently)
-}
-
-// Tail returns the trailing string in path after the final slash for a pat ending with a slash.
-//
-// Examples:
-//
-//	Tail("/hello/:title/", "/hello/mr/mizerany") == "mizerany"
-//	Tail("/:a/", "/x/y/z")                       == "y/z"
-//
-func Tail(pat, path string) string {
-	var i, j int
-	for i < len(path) {
-		switch {
-		case j >= len(pat):
-			if pat[len(pat)-1] == '/' {
-				return path[i:]
-			}
-			return ""
-		case pat[j] == ':':
-			var nextc byte
-			_, nextc, j = match(pat, isAlnum, j+1)
-			_, _, i = match(path, matchPart(nextc), i)
-		case path[i] == pat[j]:
-			i++
-			j++
-		default:
-			return ""
-		}
-	}
-	return ""
-}
-
-// Handler represents a pattern handler.
-type Handler struct {
-	pat string
-	http.Handler
-	redirect bool
-}
-
-// Match matches the given path string againts the register pattern.
-func (ph *Handler) Match(path string) (url.Values, bool) {
-	p := make(url.Values)
-	var i, j int
-	for i < len(path) {
-		switch {
-		case j >= len(ph.pat):
-			if ph.pat != "/" && len(ph.pat) > 0 && ph.pat[len(ph.pat)-1] == '/' {
-				return p, true
-			}
-			return nil, false
-		case ph.pat[j] == ':':
-			var name, val string
-			var nextc byte
-			name, nextc, j = match(ph.pat, isAlnum, j+1)
-			val, _, i = match(path, matchPart(nextc), i)
-			p.Add(":"+name, val)
-		case path[i] == ph.pat[j]:
-			i++
-			j++
-		default:
-			return nil, false
-		}
-	}
-	if j != len(ph.pat) {
-		return nil, false
-	}
-	return p, true
-}
-
-func matchPart(b byte) func(byte) bool {
-	return func(c byte) bool {
-		return c != b && c != '/'
-	}
-}
-
-func match(s string, f func(byte) bool, i int) (matched string, next byte, j int) {
-	j = i
-	for j < len(s) && f(s[j]) {
-		j++
-	}
-	if j < len(s) {
-		next = s[j]
-	}
-	return s[i:j], next, j
-}
-
-func isAlpha(ch byte) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
-}
-
-func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
-}
-
-func isAlnum(ch byte) bool {
-	return isAlpha(ch) || isDigit(ch)
+// Flush flushes all the router middleware stack.
+// Use this method if you want to
+func (r *Router) Flush() {
+	r.Layer.Flush()
 }
