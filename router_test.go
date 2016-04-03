@@ -191,6 +191,8 @@ func TestMethodPatch(t *testing.T) {
 func BenchmarkPatternMatching(b *testing.B) {
 	p := New()
 	p.Get("/hello/:name").Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		b.StopTimer()
 		r := newRequest("GET", "/hello/blake", nil)
