@@ -8,6 +8,13 @@ import (
 	"gopkg.in/vinxi/layer.v0"
 )
 
+// DefaultForwarder stores the default http.Handler to be used to forward the traffic.
+// By default the proxy will reply with 502 Bad Gateway if no custom forwarder is defined.
+var DefaultForwarder = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fwd, _ := forward.New(forward.PassHostHeader(true))
+	fwd.ServeHTTP(w, r)
+})
+
 // Route represents an HTTP route based on the given
 type Route struct {
 	// Pattern stores the path pattern
@@ -47,6 +54,9 @@ func (r *Route) Forward(uri string) *Route {
 
 // Use attaches a new middleware handler for incoming HTTP traffic.
 func (r *Route) Use(handler interface{}) *Route {
+	if r.Handler == nil {
+		r.Handler = DefaultForwarder
+	}
 	r.Layer.Use(layer.RequestPhase, handler)
 	return r
 }
@@ -54,6 +64,12 @@ func (r *Route) Use(handler interface{}) *Route {
 // UsePhase attaches a new middleware handler to a specific phase.
 func (r *Route) UsePhase(phase string, handler interface{}) *Route {
 	r.Layer.Use(phase, handler)
+	return r
+}
+
+// UseFinalHandler attaches a new http.Handler as final middleware layer handler.
+func (r *Route) UseFinalHandler(handler http.Handler) *Route {
+	r.Layer.UseFinalHandler(handler)
 	return r
 }
 

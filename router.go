@@ -95,7 +95,7 @@ var (
 //
 // When "Method Not Allowed":
 //
-// Pat knows what methods are allowed given a pattern and a URI. For
+// Router knows what methods are allowed given a pattern and a URI. For
 // convenience, Router will add the Allow header for requests that
 // match a pattern for a method other than the method requested and set the
 // Status to "405 Method Not Allowed".
@@ -104,6 +104,11 @@ var (
 // match the request path for the current method (and the Allow header is not
 // altered).
 type Router struct {
+	// ForceMethodNotAllowed, if true, is used to return a 405 Method Not Allowed response
+	// in case that the router has no configured routes for the incoming request method.
+	// Defaults to false.
+	ForceMethodNotAllowed bool
+
 	// NotFound, if set, is used whenever the request doesn't match any
 	// pattern for its method. NotFound should be set before serving any
 	// requests.
@@ -128,50 +133,50 @@ func (r *Router) Forward(uri string) *Router {
 }
 
 // Head will register a pattern for HEAD requests.
-func (r *Router) Head(pat string) *Route {
-	return r.add("HEAD", pat, nil)
+func (r *Router) Head(path string) *Route {
+	return r.add("HEAD", path, nil)
 }
 
 // Get will register a pattern for GET requests.
 // It also registers pat for HEAD requests. If this needs to be overridden, use
 // Head before Get with pat.
-func (r *Router) Get(pat string) *Route {
-	return r.add("GET", pat, nil)
+func (r *Router) Get(path string) *Route {
+	return r.add("GET", path, nil)
 }
 
 // Post will register a pattern for POST requests.
-func (r *Router) Post(pat string) *Route {
-	return r.add("POST", pat, nil)
+func (r *Router) Post(path string) *Route {
+	return r.add("POST", path, nil)
 }
 
 // Put will register a pattern for PUT requests.
-func (r *Router) Put(pat string) *Route {
-	return r.add("PUT", pat, nil)
+func (r *Router) Put(path string) *Route {
+	return r.add("PUT", path, nil)
 }
 
-// Del will register a pattern for DELETE requests.
-func (r *Router) Del(pat string) *Route {
-	return r.add("DELETE", pat, nil)
+// Delete will register a pattern for DELETE requests.
+func (r *Router) Delete(path string) *Route {
+	return r.add("DELETE", path, nil)
 }
 
 // Options will register a pattern for OPTIONS requests.
-func (r *Router) Options(pat string) *Route {
-	return r.add("OPTIONS", pat, nil)
+func (r *Router) Options(path string) *Route {
+	return r.add("OPTIONS", path, nil)
 }
 
 // Patch will register a pattern for PATCH requests.
-func (r *Router) Patch(pat string) *Route {
-	return r.add("PATCH", pat, nil)
+func (r *Router) Patch(path string) *Route {
+	return r.add("PATCH", path, nil)
 }
 
 // All will register a pattern for any HTTP method.
-func (r *Router) All(pat string) *Route {
-	return r.add("*", pat, nil)
+func (r *Router) All(path string) *Route {
+	return r.add("*", path, nil)
 }
 
 // Route will register a new route for the given pattern and HTTP method.
-func (r *Router) Route(method, pat string) *Route {
-	return r.add(method, pat, nil)
+func (r *Router) Route(method, path string) *Route {
+	return r.add(method, path, nil)
 }
 
 // add adds a new route to the router stack for the given method and path pattern.
@@ -263,6 +268,22 @@ func (r *Router) HandleHTTP(w http.ResponseWriter, req *http.Request, h http.Han
 		return
 	}
 
+	// If method not allowed behavior is enable,
+	if r.ForceMethodNotAllowed && r.isMethodNotAllowed(w, req) {
+		http.Error(w, "Method Not Allowed", 405)
+		return
+	}
+
+	// If not found handler defines, use it
+	if r.NotFound != nil {
+		r.NotFound.ServeHTTP(w, req)
+		return
+	}
+
+	h.ServeHTTP(w, req)
+}
+
+func (r *Router) isMethodNotAllowed(w http.ResponseWriter, req *http.Request) bool {
 	allowed := make([]string, 0, len(r.Routes))
 	for meth, handlers := range r.Routes {
 		if meth == req.Method {
@@ -276,20 +297,11 @@ func (r *Router) HandleHTTP(w http.ResponseWriter, req *http.Request, h http.Han
 		}
 	}
 
-	// TODO: make response optional
-	if len(allowed) > 0 {
+	isAllowed := len(allowed) > 0
+	if isAllowed {
 		w.Header().Add("Allow", strings.Join(allowed, ", "))
-		http.Error(w, "Method Not Allowed", 405)
-		return
 	}
-
-	// If not found handler defines, use it
-	if r.NotFound != nil {
-		r.NotFound.ServeHTTP(w, req)
-		return
-	}
-
-	h.ServeHTTP(w, req)
+	return isAllowed
 }
 
 // Use attaches a new middleware handler for incoming HTTP traffic.
