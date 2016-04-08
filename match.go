@@ -1,8 +1,6 @@
 package router
 
-import (
-	"net/url"
-)
+import "net/url"
 
 // Match matches the given path string againts the register pattern.
 func Match(pat, path string) (url.Values, bool) {

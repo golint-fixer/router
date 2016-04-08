@@ -224,6 +224,7 @@ func (r *Router) match(method, path string) (url.Values, *Route) {
 	return doMatch(r.Routes["*"], path)
 }
 
+// doMatch is used to match a given path againts the registered routes pool.
 func doMatch(routes []*Route, path string) (url.Values, *Route) {
 	if routes == nil || len(routes) == 0 {
 		return nil, nil
@@ -283,6 +284,8 @@ func (r *Router) HandleHTTP(w http.ResponseWriter, req *http.Request, h http.Han
 	h.ServeHTTP(w, req)
 }
 
+// isMethodNowAllowed is used to verify if the given route doesn't allows
+// the given HTTP request method.
 func (r *Router) isMethodNotAllowed(w http.ResponseWriter, req *http.Request) bool {
 	allowed := make([]string, 0, len(r.Routes))
 	for meth, handlers := range r.Routes {

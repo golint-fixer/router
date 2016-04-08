@@ -49,6 +49,7 @@ func TestRoutingHit(t *testing.T) {
 
 func TestRoutingMethodNotAllowed(t *testing.T) {
 	p := New()
+	p.ForceMethodNotAllowed = true
 
 	var ok bool
 	p.Post("/foo/:name").Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,9 +61,13 @@ func TestRoutingMethodNotAllowed(t *testing.T) {
 	}))
 
 	r := httptest.NewRecorder()
-	p.HandleHTTP(r, newRequest("GET", "/foo/keith", nil), nil)
+	var final bool
+	p.HandleHTTP(r, newRequest("GET", "/foo/keith", nil), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		final = true
+	}))
 
 	st.Expect(t, ok, false)
+	st.Expect(t, final, false)
 	st.Expect(t, r.Code, http.StatusMethodNotAllowed)
 
 	got := strings.Split(r.Header().Get("Allow"), ", ")
@@ -146,7 +151,12 @@ func TestMethodPatch(t *testing.T) {
 	// issue a GET request to a handler that only supports the PATCH method.
 	res := httptest.NewRecorder()
 	res.Code = http.StatusMethodNotAllowed
-	p.HandleHTTP(res, newRequest("GET", "/foo/bar", nil), nil)
+	var final bool
+	p.HandleHTTP(res, newRequest("GET", "/foo/bar", nil), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		final = true
+	}))
+
+	st.Expect(t, final, true)
 	st.Expect(t, res.Code, http.StatusMethodNotAllowed)
 
 	// Now, test to see if we get a 200 OK from issuing a PATCH request to
