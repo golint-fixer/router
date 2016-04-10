@@ -121,7 +121,7 @@ type Router struct {
 	Routes map[string][]*Route
 }
 
-// New returns a new Router.
+// New creates a new Router.
 func New() *Router {
 	return &Router{Layer: layer.New(), Routes: make(map[string][]*Route)}
 }
@@ -193,6 +193,9 @@ func (r *Router) add(method, pat string, handler http.Handler) *Route {
 	if handler != nil {
 		route.Handler = handler
 	}
+
+	// Set middleware parent layer
+	route.SetParent(r.Layer)
 
 	// Register the route in the router stack
 	r.Routes[method] = append(routes, route)
@@ -323,4 +326,15 @@ func (r *Router) UsePhase(phase string, handler ...interface{}) *Router {
 func (r *Router) UseFinalHandler(fn http.Handler) *Router {
 	r.Layer.UseFinalHandler(fn)
 	return r
+}
+
+// SetParent sets a middleware parent layer.
+// This method is tipically called via inversion of control from vinxi layer.
+func (r *Router) SetParent(parent layer.Middleware) {
+	r.Layer.SetParent(parent)
+}
+
+// Flush flushes the router middleware stack.
+func (r *Router) Flush() {
+	r.Layer.Flush()
 }
