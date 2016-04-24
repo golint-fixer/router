@@ -4,7 +4,6 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -233,13 +232,11 @@ func doMatch(routes []*Route, path string) (url.Values, *Route) {
 	if routes == nil || len(routes) == 0 {
 		return nil, nil
 	}
-	fmt.Printf("> Routes: %d \n", len(routes))
 	for _, route := range routes {
 		if params, ok := route.Match(path); ok {
 			return params, route
 		}
 	}
-	fmt.Printf(">>>>>>> End matching\n")
 	return nil, nil
 }
 

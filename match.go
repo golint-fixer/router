@@ -1,14 +1,12 @@
 package router
 
 import "net/url"
-import "fmt"
 
 // Match matches the given path string againts the register pattern.
 func Match(pat, path string) (url.Values, bool) {
 	var i, j int
 	p := make(url.Values)
 
-	fmt.Printf("> Test: %s %s\n", pat, path)
 	for i < len(path) {
 		switch {
 		case j >= len(pat):
