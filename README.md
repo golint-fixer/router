@@ -1,5 +1,7 @@
 # router [![Build Status](https://travis-ci.org/vinxi/router.png)](https://travis-ci.org/vinxi/router) [![GoDoc](https://godoc.org/github.com/vinxi/router?status.svg)](https://godoc.org/github.com/vinxi/router) [![Coverage Status](https://coveralls.io/repos/github/vinxi/router/badge.svg?branch=master)](https://coveralls.io/github/vinxi/router?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/vinxi/router)](https://goreportcard.com/report/github.com/vinxi/router) [![API](https://img.shields.io/badge/vinxi-core-green.svg?style=flat)](https://godoc.org/github.com/vinxi/layer) 
 
+**Note**: deprecated repository. Source has been merged into `vinxi/vinxi`.
+
 Featured and fast router used by vinxi. Provides a hierarchical middleware layer.
 
 Originally based in [bmizerany/pat](https://github.com/bmizerany/pat).
